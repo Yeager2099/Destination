@@ -9,16 +9,27 @@ contract Destination is AccessControl {
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
 
     // Mapping: underlying => wrapped
-    mapping(address => address) public underlying_tokens;
-    // Mapping: wrapped => underlying
     mapping(address => address) public wrapped_tokens;
+    // Mapping: wrapped => underlying
+    mapping(address => address) public underlying_tokens;
     // List of all wrapped token addresses
     address[] private tokens;
 
-    // Events
-    event Creation(address indexed underlying, address indexed wrapped);
-    event Wrap(address indexed underlying, address indexed wrapped, address to, uint amount);
-    event Unwrap(address indexed underlying, address indexed wrapped, address from, address to, uint amount);
+    // 修正事件参数名称，与测试预期匹配
+    event Creation(address indexed underlying_token, address indexed wrapped_token);
+    event Wrap(
+        address indexed underlying_token,
+        address indexed wrapped_token,
+        address to,
+        uint256 amount
+    );
+    event Unwrap(
+        address indexed underlying_token,
+        address indexed wrapped_token,
+        address frm,  // 测试预期的参数名称是frm而非from
+        address to,
+        uint256 amount
+    );
 
     constructor(address admin) {
         require(admin != address(0), "Admin address cannot be zero");
@@ -44,12 +55,12 @@ contract Destination is AccessControl {
         underlying_tokens[wrapped] = underlying;
         tokens.push(wrapped);
 
-        emit Creation(underlying, wrapped);
+        emit Creation(underlying, wrapped);  // 触发事件时使用正确的参数
         return wrapped;
     }
 
     /// @notice Mint wrapped tokens to `to` address.
-    function wrap(address underlying, address to, uint amount)
+    function wrap(address underlying, address to, uint256 amount)
         public
         onlyRole(WARDEN_ROLE)
     {
@@ -59,20 +70,18 @@ contract Destination is AccessControl {
         require(underlying_tokens[wrapped] == underlying, "Invalid token mapping");
 
         BridgeToken(wrapped).mint(to, amount);
-        emit Wrap(underlying, wrapped, to, amount);
+        emit Wrap(underlying, wrapped, to, amount);  // 触发事件时使用正确的参数
     }
 
     /// @notice Burn wrapped tokens from caller and initiate unwrapping process.
-    function unwrap(address wrapped, address to, uint amount) public {
+    function unwrap(address wrapped, address to, uint256 amount) public {
         require(to != address(0), "Recipient cannot be zero address");
         address underlying = underlying_tokens[wrapped];
         require(underlying != address(0), "Invalid wrapped token");
-
-        // ✅ 修复：只检查是否存在映射即可，不要再错误地 reverse 检查
         require(wrapped_tokens[underlying] == wrapped, "Invalid token mapping");
 
         BridgeToken(wrapped).burnFrom(msg.sender, amount);
-        emit Unwrap(underlying, wrapped, msg.sender, to, amount);
+        emit Unwrap(underlying, wrapped, msg.sender, to, amount);  // 触发事件时使用正确的参数
     }
 
     /// @notice Get all wrapped token addresses
