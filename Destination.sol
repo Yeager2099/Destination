@@ -34,14 +34,14 @@ contract Destination is AccessControl {
         returns (address)
     {
         require(underlying != address(0), "Underlying cannot be zero address");
-        require(underlying_tokens[underlying] == address(0), "Token already exists");
+        require(wrapped_tokens[underlying] == address(0), "Token already exists");
 
         BridgeToken wrappedToken = new BridgeToken(underlying, name, symbol, address(this));
         wrappedToken.grantRole(wrappedToken.MINTER_ROLE(), address(this));
 
         address wrapped = address(wrappedToken);
-        underlying_tokens[underlying] = wrapped;
-        wrapped_tokens[wrapped] = underlying;
+        wrapped_tokens[underlying] = wrapped; 
+        underlying_tokens[wrapped] = underlying;
         tokens.push(wrapped);
 
         emit Creation(underlying, wrapped);
