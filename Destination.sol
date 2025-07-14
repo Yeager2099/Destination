@@ -20,14 +20,14 @@ contract Destination is AccessControl {
     event Wrap(
         address indexed underlying_token,
         address indexed wrapped_token,
-        address to,
+        address indexed to,
         uint256 amount
     );
     event Unwrap(
         address indexed underlying_token,
         address indexed wrapped_token,
         address frm,  // 测试预期的参数名称是frm而非from
-        address to,
+        address indexed to,
         uint256 amount
     );
 
