@@ -9,13 +9,13 @@ contract Destination is AccessControl {
     bytes32 public constant WARDEN_ROLE = keccak256("BRIDGE_WARDEN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
     
-    mapping(address => address) public underlying_tokens; // underlying => wrapped
-    mapping(address => address) public wrapped_tokens;    // wrapped => underlying
+    mapping(address => address) public underlying_tokens;
+    mapping(address => address) public wrapped_tokens;
     address[] public tokens;
 
-    event Creation(address indexed underlying_token, address indexed wrapped_token);
-    event Wrap(address indexed underlying_token, address indexed wrapped_token, address indexed to, uint256 amount);
-    event Unwrap(address indexed underlying_token, address indexed wrapped_token, address frm, address indexed to, uint256 amount);
+    event Creation(address indexed underlying, address indexed wrapped);
+    event Wrap(address indexed underlying, address indexed wrapped, address to, uint amount);
+    event Unwrap(address indexed underlying, address indexed wrapped, address from, address to, uint amount);
 
     constructor(address admin) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -23,47 +23,47 @@ contract Destination is AccessControl {
         _grantRole(WARDEN_ROLE, admin);
     }
 
-    function wrap(address _underlying_token, address _recipient, uint256 _amount) 
-        public 
-        onlyRole(WARDEN_ROLE) 
-    {
-        address wrappedToken = underlying_tokens[_underlying_token];
-        require(wrappedToken != address(0), "Token not registered");
+    function wrap(address underlying, address to, uint amount) public onlyRole(WARDEN_ROLE) {
+        address wrapped = underlying_tokens[underlying];
+        require(wrapped != address(0), "Token not registered");
         
-        BridgeToken(wrappedToken).mint(_recipient, _amount);
-        emit Wrap(_underlying_token, wrappedToken, _recipient, _amount);
+        // 双重确认映射关系
+        require(wrapped_tokens[wrapped] == underlying, "Invalid token mapping");
+        
+        BridgeToken(wrapped).mint(to, amount);
+        emit Wrap(underlying, wrapped, to, amount);
     }
 
-    function unwrap(address _wrapped_token, address _recipient, uint256 _amount) 
-        public 
-        onlyRole(WARDEN_ROLE) 
-    {
-        address underlying = wrapped_tokens[_wrapped_token];
+    function unwrap(address wrapped, address to, uint amount) public onlyRole(WARDEN_ROLE) {
+        address underlying = wrapped_tokens[wrapped];
         require(underlying != address(0), "Invalid wrapped token");
         
-        BridgeToken(_wrapped_token).burnFrom(msg.sender, _amount);
-        emit Unwrap(underlying, _wrapped_token, msg.sender, _recipient, _amount);
+        // 双重确认映射关系
+        require(underlying_tokens[underlying] == wrapped, "Invalid token mapping");
+        
+        BridgeToken(wrapped).burnFrom(msg.sender, amount);
+        emit Unwrap(underlying, wrapped, msg.sender, to, amount);
     }
 
-    function createToken(address _underlying_token, string memory name, string memory symbol) 
+    function createToken(address underlying, string memory name, string memory symbol) 
         public 
         onlyRole(CREATOR_ROLE) 
         returns(address) 
     {
-        require(underlying_tokens[_underlying_token] == address(0), "Token already exists");
+        require(underlying_tokens[underlying] == address(0), "Token exists");
         
-        BridgeToken newToken = new BridgeToken(_underlying_token, name, symbol, msg.sender);
-        address wrappedToken = address(newToken);
+        BridgeToken wrappedToken = new BridgeToken(underlying, name, symbol, address(this));
         
-        // Grant MINTER_ROLE to this contract
-        newToken.grantRole(newToken.MINTER_ROLE(), address(this));
+        // 授予必要的角色
+        bytes32 minterRole = wrappedToken.MINTER_ROLE();
+        wrappedToken.grantRole(minterRole, address(this));
         
-        // Update mappings
-        underlying_tokens[_underlying_token] = wrappedToken;
-        wrapped_tokens[wrappedToken] = _underlying_token;
-        tokens.push(wrappedToken);
+        // 更新映射
+        underlying_tokens[underlying] = address(wrappedToken);
+        wrapped_tokens[address(wrappedToken)] = underlying;
+        tokens.push(address(wrappedToken));
         
-        emit Creation(_underlying_token, wrappedToken);
-        return wrappedToken;
+        emit Creation(underlying, address(wrappedToken));
+        return address(wrappedToken);
     }
 }
