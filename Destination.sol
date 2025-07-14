@@ -8,8 +8,9 @@ import "./BridgeToken.sol";
 contract Destination is AccessControl {
     bytes32 public constant WARDEN_ROLE = keccak256("BRIDGE_WARDEN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
+    
     mapping(address => address) public underlying_tokens; // underlying => wrapped
-    mapping(address => address) public wrapped_tokens;   // wrapped => underlying
+    mapping(address => address) public wrapped_tokens;    // wrapped => underlying
     address[] public tokens;
 
     event Creation(address indexed underlying_token, address indexed wrapped_token);
@@ -22,7 +23,10 @@ contract Destination is AccessControl {
         _grantRole(WARDEN_ROLE, admin);
     }
 
-    function wrap(address _underlying_token, address _recipient, uint256 _amount) public onlyRole(WARDEN_ROLE) {
+    function wrap(address _underlying_token, address _recipient, uint256 _amount) 
+        public 
+        onlyRole(WARDEN_ROLE) 
+    {
         address wrappedToken = underlying_tokens[_underlying_token];
         require(wrappedToken != address(0), "Token not registered");
         
@@ -30,7 +34,10 @@ contract Destination is AccessControl {
         emit Wrap(_underlying_token, wrappedToken, _recipient, _amount);
     }
 
-    function unwrap(address _wrapped_token, address _recipient, uint256 _amount) public {
+    function unwrap(address _wrapped_token, address _recipient, uint256 _amount) 
+        public 
+        onlyRole(WARDEN_ROLE) 
+    {
         address underlying = wrapped_tokens[_wrapped_token];
         require(underlying != address(0), "Invalid wrapped token");
         
@@ -48,6 +55,10 @@ contract Destination is AccessControl {
         BridgeToken newToken = new BridgeToken(_underlying_token, name, symbol, msg.sender);
         address wrappedToken = address(newToken);
         
+        // Grant MINTER_ROLE to this contract
+        newToken.grantRole(newToken.MINTER_ROLE(), address(this));
+        
+        // Update mappings
         underlying_tokens[_underlying_token] = wrappedToken;
         wrapped_tokens[wrappedToken] = _underlying_token;
         tokens.push(wrappedToken);
