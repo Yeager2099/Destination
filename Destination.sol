@@ -8,17 +8,14 @@ contract Destination is AccessControl {
     bytes32 public constant WARDEN_ROLE = keccak256("BRIDGE_WARDEN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
 
-    // Mapping: underlying => wrapped
     mapping(address => address) public underlying_tokens;
-    // Mapping: wrapped => underlying
     mapping(address => address) public wrapped_tokens;
-    // List of all wrapped token addresses
     address[] private tokens;
 
-    // Events (已重命名参数以匹配 test 文件)
     event Creation(address indexed underlying, address indexed wrapped);
-    event Wrap(address indexed underlying_token, address indexed wrapped_token, address to, uint amount);
-    event Unwrap(address indexed underlying_token, address indexed wrapped_token, address from, address to, uint amount);
+    // ✅ 参数名不要加 _token，否则测试不认
+    event Wrap(address indexed underlying, address indexed wrapped, address to, uint amount);
+    event Unwrap(address indexed underlying, address indexed wrapped, address from, address to, uint amount);
 
     constructor(address admin) {
         require(admin != address(0), "Admin address cannot be zero");
@@ -27,7 +24,6 @@ contract Destination is AccessControl {
         _grantRole(WARDEN_ROLE, admin);
     }
 
-    /// @notice Create a new wrapped token for the given underlying token.
     function createToken(address underlying, string memory name, string memory symbol)
         public
         onlyRole(CREATOR_ROLE)
@@ -40,8 +36,6 @@ contract Destination is AccessControl {
         wrappedToken.grantRole(wrappedToken.MINTER_ROLE(), address(this));
 
         address wrapped = address(wrappedToken);
-
-        // ✅ 修复映射方向
         underlying_tokens[underlying] = wrapped;
         wrapped_tokens[wrapped] = underlying;
         tokens.push(wrapped);
@@ -50,7 +44,6 @@ contract Destination is AccessControl {
         return wrapped;
     }
 
-    /// @notice Mint wrapped tokens to `to` address.
     function wrap(address underlying, address to, uint amount)
         public
         onlyRole(WARDEN_ROLE)
@@ -64,7 +57,6 @@ contract Destination is AccessControl {
         emit Wrap(underlying, wrapped, to, amount);
     }
 
-    /// @notice Burn wrapped tokens from caller and initiate unwrapping process.
     function unwrap(address wrapped, address to, uint amount) public {
         require(to != address(0), "Recipient cannot be zero address");
         address underlying = wrapped_tokens[wrapped];
@@ -75,12 +67,10 @@ contract Destination is AccessControl {
         emit Unwrap(underlying, wrapped, msg.sender, to, amount);
     }
 
-    /// @notice Get all wrapped token addresses
     function getWrappedTokens() external view returns (address[] memory) {
         return tokens;
     }
 
-    /// @notice Get the counterpart token for a given token (either wrapped or underlying)
     function getMapping(address token) external view returns (address) {
         address mapped = underlying_tokens[token];
         if (mapped != address(0)) {
