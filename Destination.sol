@@ -54,9 +54,9 @@ contract Destination is AccessControl {
         onlyRole(WARDEN_ROLE)
     {
         require(to != address(0), "Recipient cannot be zero address");
-        address wrapped = underlying_tokens[underlying];
+        address wrapped = wrapped_tokens[underlying];
         require(wrapped != address(0), "Token not registered");
-        require(wrapped_tokens[wrapped] == underlying, "Invalid token mapping");
+        require(underlying_tokens[wrapped] == underlying, "Invalid token mapping");
 
         BridgeToken(wrapped).mint(to, amount);
         emit Wrap(underlying, wrapped, to, amount);
@@ -65,9 +65,11 @@ contract Destination is AccessControl {
     /// @notice Burn wrapped tokens from caller and initiate unwrapping process.
     function unwrap(address wrapped, address to, uint amount) public {
         require(to != address(0), "Recipient cannot be zero address");
-        address underlying = wrapped_tokens[wrapped];
+        address underlying = underlying_tokens[wrapped];
         require(underlying != address(0), "Invalid wrapped token");
-        require(underlying_tokens[underlying] == wrapped, "Invalid token mapping");
+
+        // ✅ 修复：只检查是否存在映射即可，不要再错误地 reverse 检查
+        require(wrapped_tokens[underlying] == wrapped, "Invalid token mapping");
 
         BridgeToken(wrapped).burnFrom(msg.sender, amount);
         emit Unwrap(underlying, wrapped, msg.sender, to, amount);
